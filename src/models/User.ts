@@ -43,3 +43,5 @@ const UserSchema = new mongoose.Schema<UserInterface>({
     ref: 'Message' 
   }]
 });
+
+export default mongoose.models.User || mongoose.model<UserInterface>('User', UserSchema);
