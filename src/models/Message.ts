@@ -10,5 +10,8 @@ const MessageSchema = new mongoose.Schema<MessageInterface>({
     type: String, 
     required: [true, 'Message content is required'] 
   },
-  
+  createdAt: { 
+    type: Date, 
+    default: Date.now 
+  }
 });
