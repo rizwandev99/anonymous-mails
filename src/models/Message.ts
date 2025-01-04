@@ -15,3 +15,5 @@ const MessageSchema = new mongoose.Schema<MessageInterface>({
     default: Date.now 
   }
 });
+
+export default mongoose.models.Message || mongoose.model<MessageInterface>('Message', MessageSchema);
