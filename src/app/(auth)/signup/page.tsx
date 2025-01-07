@@ -24,15 +24,26 @@ export default function SignUpPage() {
       return;
     }
 
-    // Generate and send OTP
-    const newOtp = generateOTP();
-    const success = await sendOtpEmail(email, newOtp);
+    try {
+      // Generate and send OTP
+      const newOtp = generateOTP();
+      console.log("Generated OTP:", newOtp); // Log generated OTP for debugging
+      console.log("Sending OTP to email:", email); // Log email being used
 
-    if (success) {
-      setGeneratedOtp(newOtp);
-      setStep("otp");
-    } else {
-      alert("Failed to send OTP. Please try again.");
+      const success = await sendOtpEmail(email, newOtp);
+
+      console.log("OTP Email Send Result:", success); // Log the result of email sending
+
+      if (success) {
+        setGeneratedOtp(newOtp);
+        setStep("otp");
+      } else {
+        console.error("Failed to send OTP email to:", email);
+        alert("Failed to send OTP. Please check your email and try again.");
+      }
+    } catch (error) {
+      console.error("Signup Process Error:", error);
+      alert("An unexpected error occurred during signup. Please try again.");
     }
   };
 
