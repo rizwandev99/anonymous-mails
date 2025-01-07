@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 export interface MessageInterface {
-  _id?: mongoose.Types.ObjectId;
   content: string;
   createdAt: Date;
 }
