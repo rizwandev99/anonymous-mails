@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { MessageInterface } from './Message';
 
 export interface UserInterface {
+  username: string;
   email: string;
   password: string;
   verifyCode: string;
@@ -12,6 +13,11 @@ export interface UserInterface {
 }
 
 const UserSchema = new mongoose.Schema<UserInterface>({
+  username: { 
+    type: String, 
+    required: [true, 'Username is required'],
+    unique: true,
+  },
   email: { 
     type: String, 
     required: [true, 'Email is required'],

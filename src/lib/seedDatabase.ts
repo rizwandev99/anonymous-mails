@@ -1,65 +1,89 @@
+import 'dotenv/config'
 import mongoose from 'mongoose';
-import User, { UserInterface } from '@/models/User';
-import Message, { MessageInterface } from '@/models/Message';
+import User from '@/models/User';
+import Message from '@/models/Message';
 import dbConnect from '@/lib/dbConnect';
 import bcrypt from 'bcryptjs';
 
-const messages: MessageInterface[] = [];
-const users: UserInterface[] = [];
-
+// Function to populate the database with initial test data
 async function seedDatabase() {
   try {
-    // Connect to the database
+    // Step 1: Establish a connection to the database
+    console.log('Connecting to the database...');
     await dbConnect();
 
-    // Clear existing data (optional, be careful in production)
-    await User.deleteMany({});
-    await Message.deleteMany({});
+    // Step 2: Clear existing data to start with a clean slate
+    console.log('Clearing existing database records...');
+    await Promise.all([
+      User.deleteMany({}),   // Remove all existing users
+      Message.deleteMany({}) // Remove all existing messages
+    ]);
 
-    // Create dummy messages
-    for (let i = 0; i < 10; i++) {
-      const message = await Message.create({ 
-        content: `Hey, how are you doing today? ${i + 1}` 
-      });
-      messages.push(message);
-    }
+    // Step 3: Generate secure password hashes
+    console.log('Generating secure password hashes...');
+    const passwordSalt = await bcrypt.genSalt(10);
+    const johnPassword = await bcrypt.hash('password123', passwordSalt);
+    const janePassword = await bcrypt.hash('securepass456', passwordSalt);
 
-    // Create dummy users with hashed passwords
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword1 = await bcrypt.hash('password123', salt);
-    const hashedPassword2 = await bcrypt.hash('securepass456', salt);
+    // Step 4: Create sample messages
+    console.log('Creating sample messages...');
+    const sampleMessages = await Message.create([
+      { content: 'Hello, welcome to Anonymous Mails!' },
+      { content: 'This is a test message for John' },
+      { content: 'Another test message for John' },
+      { content: 'First message for Jane' },
+      { content: 'Second message for Jane' }
+    ]);
 
-    const user1 = await User.create({
-      email: 'john.doe@example.com',
-      password: hashedPassword1,
-      verifyCode: '123456',
-      verifyCodeExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
-      isVerified: true,
-      isAcceptingMessages: true,
-      messages: messages.slice(0, 5).map(m => m._id)
-    });
-    users.push(user1);
+    // Step 5: Create sample user accounts
+    console.log('Creating sample user accounts...');
+    await User.create([
+      {
+        // First test user
+        username: 'john.doe@example.com',
+        email: 'john.doe@example.com',
+        password: johnPassword,
+        verifyCode: '123456',
+        verifyCodeExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+        isVerified: true,
+        isAcceptingMessages: true,
+        messages: sampleMessages.slice(0, 3).map(m => m._id)
+      },
+      {
+        // Second test user
+        username: 'jane.smith@example.com',
+        email: 'jane.smith@example.com',
+        password: janePassword,
+        verifyCode: '789012',
+        verifyCodeExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        isVerified: true,
+        isAcceptingMessages: true,
+        messages: sampleMessages.slice(3).map(m => m._id)
+      }
+    ]);
 
-    const user2 = await User.create({
-      email: 'jane.smith@example.com',
-      password: hashedPassword2,
-      verifyCode: '789012',
-      verifyCodeExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isVerified: true,
-      isAcceptingMessages: true,
-      messages: messages.slice(5).map(m => m._id)
-    });
-    users.push(user2);
-
-    console.log('Database seeded successfully!');
-    console.log('Created Users:', users.map(u => u.email));
-    console.log('Created Messages:', messages.map(m => m.content));
+    // Final confirmation
+    console.log('🎉 Database seeding completed successfully!');
   } catch (error) {
-    console.error('Error seeding database:', error);
+    // Detailed error logging
+    console.error('❌ Failed to seed database:', error);
+    
+    // Provide more context about the error
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message
+      });
+    }
   } finally {
+    // Always close the database connection
+    console.log('Closing database connection...');
     await mongoose.connection.close();
   }
 }
 
-// Immediately invoked function to seed the database
-seedDatabase().catch(console.error);
+// Run the seeding function and catch any unhandled errors
+seedDatabase().catch(error => {
+  console.error('Unhandled error in seedDatabase:', error);
+  process.exit(1); // Exit with error code
+});
