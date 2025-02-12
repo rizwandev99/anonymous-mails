@@ -10,16 +10,20 @@
     "seed": "tsx src/lib/seedDatabase.ts"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.7.4",
+    "@prisma/client": "^6.2.1",
     "@react-email/components": "^0.0.31",
     "@react-email/render": "^1.0.4",
     "bcryptjs": "^2.4.3",
     "mongoose": "^8.9.3",
     "next": "15.1.3",
+    "next-auth": "^4.24.11",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.4.0",
     "resend": "^4.0.1",
-    "usehooks-ts": "^3.1.0"
+    "usehooks-ts": "^3.1.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -94,19 +94,11 @@ export default function SignUpPage() {
   ): Promise<boolean | null> => {
     if (!value.trim()) return null;
 
-    const setCheckingState = (isChecking: boolean) => {
-      type === "username"
-        ? setIsCheckingUsername(isChecking)
-        : setIsCheckingEmail(isChecking);
-    };
-
-    const setAvailabilityState = (available: boolean | null) => {
-      type === "username"
-        ? setUsernameAvailability(available)
-        : setEmailAvailability(available);
-    };
-
-    setCheckingState(true);
+    if (type === "username") {
+      setIsCheckingUsername(true);
+    } else {
+      setIsCheckingEmail(true);
+    }
 
     try {
       const response = await fetch("/api/check-availability", {
@@ -123,17 +115,29 @@ export default function SignUpPage() {
 
       const result: AvailabilityResponse = await response.json();
 
-      setAvailabilityState(result.available);
-      setCheckingState(false);
+      if (type === "username") {
+        setUsernameAvailability(result.available);
+      } else {
+        setEmailAvailability(result.available);
+      }
 
       return result.available;
     } catch (error) {
       console.error(`${type} availability check failed`, error);
 
-      setAvailabilityState(null);
-      setCheckingState(false);
+      if (type === "username") {
+        setUsernameAvailability(null);
+      } else {
+        setEmailAvailability(null);
+      }
 
       return null;
+    } finally {
+      if (type === "username") {
+        setIsCheckingUsername(false);
+      } else {
+        setIsCheckingEmail(false);
+      }
     }
   };
 

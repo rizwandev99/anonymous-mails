@@ -1,19 +1,16 @@
-import mongoose from 'mongoose';
+import { z } from "zod";
 
-export interface MessageInterface {
-  content: string;
-  createdAt: Date;
+// 🎯 Create a simple string schema
+const nameSchema = z.string()
+  .min(2, "Name must be at least 2 characters") // Minimum length
+  .max(30, "Name is too long!"); // Maximum length
+
+// 🧪 Let's try using it!
+try {
+  const validName = nameSchema.parse("John"); // ✅ Works!
+  console.log("Valid name:", validName);
+  
+  nameSchema.parse("A"); // ❌ Will throw error (too short)
+} catch (error) {
+  console.error("Validation failed:", error);
 }
-
-const MessageSchema = new mongoose.Schema<MessageInterface>({
-  content: { 
-    type: String, 
-    required: [true, 'Message content is required'] 
-  },
-  createdAt: { 
-    type: Date, 
-    default: Date.now 
-  }
-});
-
-export default mongoose.models.Message || mongoose.model<MessageInterface>('Message', MessageSchema);
