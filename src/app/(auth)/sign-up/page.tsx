@@ -1,355 +1,188 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, FormEvent } from "react";
-import { sendOtpEmail, generateOTP } from "@/lib/otpService";
-import { useRouter } from "next/navigation";
+import { ApiResponse } from '@/types/ApiResponse';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useDebounce } from 'usehooks-ts';
+import * as z from 'zod';
 
-// Comprehensive type definitions
-type SignUpFormType = {
-  username: string;
-  email: string;
-  password: string;
-};
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
+import axios, { AxiosError } from 'axios';
+import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { signUpSchema } from '@/schemas/signUpSchema';
 
-type AvailabilityCheckType = "username" | "email";
+export default function SignUpForm() {
+  const [username, setUsername] = useState('');
+  const [usernameMessage, setUsernameMessage] = useState('');
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const debouncedUsername = useDebounce(username, 300);
 
-type AvailabilityResponse = {
-  available: boolean;
-  message?: string;
-};
-
-type SignUpStep = "signup" | "otp";
-
-// Debounce hook with generic type and improved typing
-const useDebounce = <T,>(value: T, delay: number): T => {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
-
-export default function SignUpPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
-  // Comprehensive state management with explicit types
-  const [formData, setFormData] = useState<SignUpFormType>({
-    username: "",
-    email: "",
-    password: "",
+  const form = useForm<z.infer<typeof signUpSchema>>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+    },
   });
 
-  const [otp, setOtp] = useState<string>("");
-  const [generatedOtp, setGeneratedOtp] = useState<string>("");
-  const [step, setStep] = useState<SignUpStep>("signup");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-
-  // Availability states
-  const [usernameAvailability, setUsernameAvailability] = useState<
-    boolean | null
-  >(null);
-  const [emailAvailability, setEmailAvailability] = useState<boolean | null>(
-    null
-  );
-  const [isCheckingUsername, setIsCheckingUsername] = useState<boolean>(false);
-  const [isCheckingEmail, setIsCheckingEmail] = useState<boolean>(false);
-
-  // Debounced values
-  const debouncedUsername = useDebounce(formData.username, 500);
-  const debouncedEmail = useDebounce(formData.email, 500);
-
-  // Generic input change handler
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: keyof SignUpFormType
-  ) => {
-    const newValue = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      [field]: newValue,
-    }));
-
-    // Clear availability state when input is empty
-    if (!newValue.trim()) {
-      if (field === "username") {
-        setUsernameAvailability(null);
-      } else if (field === "email") {
-        setEmailAvailability(null);
-      }
-    }
-  };
-
-  // Availability check function with improved type safety
-  const checkAvailability = async (
-    type: AvailabilityCheckType,
-    value: string
-  ): Promise<boolean | null> => {
-    if (!value.trim()) return null;
-
-    if (type === "username") {
-      setIsCheckingUsername(true);
-    } else {
-      setIsCheckingEmail(true);
-    }
-
-    try {
-      const response = await fetch("/api/check-availability", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ type, value }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Availability check failed: ${response.status}`);
-      }
-
-      const result: AvailabilityResponse = await response.json();
-
-      if (type === "username") {
-        setUsernameAvailability(result.available);
-      } else {
-        setEmailAvailability(result.available);
-      }
-
-      return result.available;
-    } catch (error) {
-      console.error(`${type} availability check failed`, error);
-
-      if (type === "username") {
-        setUsernameAvailability(null);
-      } else {
-        setEmailAvailability(null);
-      }
-
-      return null;
-    } finally {
-      if (type === "username") {
-        setIsCheckingUsername(false);
-      } else {
-        setIsCheckingEmail(false);
-      }
-    }
-  };
-
-  // Username availability check effect
   useEffect(() => {
-    if (debouncedUsername) {
-      checkAvailability("username", debouncedUsername);
-    }
+    const checkUsernameUnique = async () => {
+      if (debouncedUsername) {
+        setIsCheckingUsername(true);
+        setUsernameMessage(''); // Reset message
+        try {
+          const response = await axios.get<ApiResponse>(
+            `/api/check-username-unique?username=${debouncedUsername}`
+          );
+          setUsernameMessage(response.data.message);
+        } catch (error) {
+          const axiosError = error as AxiosError<ApiResponse>;
+          setUsernameMessage(
+            axiosError.response?.data.message ?? 'Error checking username'
+          );
+        } finally {
+          setIsCheckingUsername(false);
+        }
+      }
+    };
+    checkUsernameUnique();
   }, [debouncedUsername]);
 
-  // Email availability check effect
-  useEffect(() => {
-    if (debouncedEmail) {
-      checkAvailability("email", debouncedEmail);
-    }
-  }, [debouncedEmail]);
-
-  // Sign-up handler with comprehensive validation
-  const handleSignUp = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    // Validate form fields
-    const { username, email, password } = formData;
-    const trimmedUsername = username.trim();
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    // Comprehensive validation
-    if (!trimmedUsername || !trimmedEmail || !trimmedPassword) {
-      alert("Please fill in all fields");
-      return;
-    }
-
-    if (usernameAvailability !== true || emailAvailability !== true) {
-      alert("Please ensure username and email are available");
-      return;
-    }
-
+  const onSubmit = async (data: z.infer<typeof signUpSchema>) => {
+    setIsSubmitting(true);
     try {
-      const newOtp = generateOTP();
-      const success = await sendOtpEmail(email, newOtp);
+      const response = await axios.post<ApiResponse>('/api/sign-up', data);
 
-      if (success) {
-        setGeneratedOtp(newOtp);
-        setStep("otp");
-      } else {
-        alert("Failed to send OTP. Please check your email.");
-      }
+      toast({
+        title: 'Success',
+        description: response.data.message,
+      });
+
+      router.replace(`/verify/${username}`);
+
+      setIsSubmitting(false);
     } catch (error) {
-      console.error("Signup error:", error);
-      alert("An error occurred during signup. Please try again.");
-    }
-  };
+      console.error('Error during sign-up:', error);
 
-  // Toggle password visibility
-  const togglePasswordVisibility = () => {
-    setShowPassword((prev) => !prev);
-  };
+      const axiosError = error as AxiosError<ApiResponse>;
 
-  // OTP submit handler
-  const handleOtpSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+      // Default error message
+      let errorMessage = axiosError.response?.data.message;
+      ('There was a problem with your sign-up. Please try again.');
 
-    if (otp.trim() === generatedOtp) {
-      // Proceed with user registration
-      router.push("/dashboard");
-    } else {
-      alert("Invalid OTP. Please try again.");
+      toast({
+        title: 'Sign Up Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-white 
-      flex items-center justify-center p-4 overflow-hidden"
-    >
-      <div
-        className="relative w-full max-w-md bg-white rounded-xl 
-        border border-gray-200 shadow-lg overflow-hidden"
-      >
-        <div className="p-10 relative z-10">
-          <div className="text-center mb-10">
-            <h2 className="text-4xl font-bold text-black mb-4">
-              {step === "signup" ? "Create Account" : "Verify OTP"}
-            </h2>
-            <p className="text-gray-600 text-sm tracking-wide">
-              {step === "signup"
-                ? "Unlock a world of possibilities"
-                : "Secure verification in seconds"}
-            </p>
-          </div>
+    <div className="flex justify-center items-center min-h-screen bg-gray-800">
+      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-6">
+            Join True Feedback
+          </h1>
+          <p className="mb-4">Sign up to start your anonymous adventure</p>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              name="username"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username</FormLabel>
+                  <Input
+                    {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setUsername(e.target.value);
+                    }}
+                  />
+                  {isCheckingUsername && <Loader2 className="animate-spin" />}
+                  {!isCheckingUsername && usernameMessage && (
+                    <p
+                      className={`text-sm ${
+                        usernameMessage === 'Username is unique'
+                          ? 'text-green-500'
+                          : 'text-red-500'
+                      }`}
+                    >
+                      {usernameMessage}
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              name="email"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <Input {...field} name="email" />
+                  <p className='text-muted text-gray-400 text-sm'>We will send you a verification code</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          {step === "signup" ? (
-            <form onSubmit={handleSignUp} className="space-y-6">
-              <div className="relative group">
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={formData.username}
-                  onChange={(e) => handleInputChange(e, "username")}
-                  required
-                  className={`w-full px-4 py-4 bg-white border border-gray-300 rounded-xl text-black 
-                  transition-all duration-300 focus:outline-none focus:ring-2 ${
-                    usernameAvailability === false
-                      ? "ring-red-500/50"
-                      : usernameAvailability === true
-                        ? "ring-green-500/50"
-                        : "ring-gray-500/50"
-                  }`}
-                />
-                {isCheckingUsername && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600">
-                    Checking...
-                  </div>
-                )}
-                {usernameAvailability === false && (
-                  <p className="text-sm text-red-500 mt-2">
-                    Username is not available
-                  </p>
-                )}
-                {usernameAvailability === true && (
-                  <p className="text-sm text-green-500 mt-2">
-                    Username is available
-                  </p>
-                )}
-              </div>
-
-              <div className="relative group">
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange(e, "email")}
-                  required
-                  className={`w-full px-4 py-4 bg-white border border-gray-300 rounded-xl text-black 
-                  transition-all duration-300 focus:outline-none focus:ring-2 ${
-                    emailAvailability === false
-                      ? "ring-red-500/50"
-                      : emailAvailability === true
-                        ? "ring-green-500/50"
-                        : "ring-gray-500/50"
-                  }`}
-                />
-                {isCheckingEmail && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600">
-                    Checking...
-                  </div>
-                )}
-                {emailAvailability === false && (
-                  <p className="text-sm text-red-500 mt-2">
-                    Email is already registered
-                  </p>
-                )}
-                {emailAvailability === true && (
-                  <p className="text-sm text-green-500 mt-2">
-                    Email is available
-                  </p>
-                )}
-              </div>
-
-              <div className="relative group">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange(e, "password")}
-                  required
-                  className="w-full px-4 pr-12 py-4 bg-white border border-gray-300 rounded-xl text-black 
-                  transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500/50"
-                />
-                <button
-                  type="button"
-                  onClick={togglePasswordVisibility}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-black transition-colors"
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-4 bg-black text-white rounded-xl 
-                transition-all duration-300 transform hover:bg-gray-800 
-                flex items-center justify-center"
-              >
-                Continue
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleOtpSubmit} className="space-y-6">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Enter 6-digit OTP"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  className="w-full px-4 py-4 bg-white border border-gray-300 rounded-xl text-black 
-                  transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500/50"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-4 bg-black text-white rounded-xl 
-                transition-all duration-300 transform hover:bg-gray-800 
-                flex items-center justify-center"
-              >
-                Verify OTP
-              </button>
-            </form>
-          )}
+            <FormField
+              name="password"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <Input type="password" {...field} name="password" />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className='w-full' disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Please wait
+                </>
+              ) : (
+                'Sign Up'
+              )}
+            </Button>
+          </form>
+        </Form>
+        <div className="text-center mt-4">
+          <p>
+            Already a member?{' '}
+            <Link href="/sign-in" className="text-blue-600 hover:text-blue-800">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>
   );
 }
+
